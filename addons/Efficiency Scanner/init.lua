@@ -94,6 +94,7 @@ local session = {
     elapsedMs        = 0,
     currentFloor     = 0,
     prevFloor        = 0,
+    lastEarnedFloor  = 0,
     pendingEndTick   = 0,
     endReason        = "complete",
     difficulty       = 0,
@@ -231,6 +232,7 @@ local function SaveHistory()
         io.write(string.format("        expGained   = %i,\n",  r.expGained))
         io.write(string.format("        expPerHour  = %i,\n",  r.expPerHour))
         io.write(string.format("        endReason    = %q,\n",  r.endReason))
+        io.write(string.format("        endFloor     = %i,\n",  r.endFloor or 0))
         io.write(string.format("        difficulty   = %q,\n",  r.difficulty))
         io.write(string.format("        playerCount  = %i,\n",  r.playerCount))
         io.write(string.format("        timestamp    = %i,\n",  r.timestamp or 0))
@@ -439,6 +441,7 @@ local function StartSession()
     session.drops            = { techCount = 0, hitCount = 0, rareCount = 0 }
     session.seenDropIds      = {}
     session.lastDropScanTick = 0
+    session.lastEarnedFloor  = session.currentFloor
     if not options.dropCountPlayerDrops then
         PreloadInventoryIds()
     end
@@ -489,6 +492,7 @@ local function EndSession()
         expGained    = session.expGained,
         expPerHour   = CalcExpPerHour(session.expGained, session.elapsedMs),
         endReason    = session.endReason,
+        endFloor     = session.lastEarnedFloor,
         difficulty   = difficultyAbbrev[session.difficulty + 1] or "?",
         playerCount  = session.playerCount,
         timestamp    = os.time(),
@@ -616,7 +620,11 @@ local function UpdateSession()
 
         local exp = GetCurrentExp()
         if exp >= session.startExp then
-            session.expGained = exp - session.startExp
+            local newExpGained = exp - session.startExp
+            if newExpGained > session.expGained then
+                session.lastEarnedFloor = floor
+            end
+            session.expGained = newExpGained
         end
 
         if floor ~= session.prevFloor and not IsOnPioneerTwo(session.prevFloor) then
@@ -834,11 +842,13 @@ local function PresentHistory()
         if r.endReason == "exit"       then tag = "  [exit]"
         elseif r.endReason == "manual" then tag = "  [stop]"
         end
-        local dateStr = r.timestamp and os.date("%b %d", r.timestamp) or "?"
-        imgui.Text(string.format("  %s  %dP  %s%s",
+        local dateStr    = r.timestamp and os.date("%b %d", r.timestamp) or "?"
+        local floorStr   = r.endFloor and r.endFloor > 0 and FloorAbbrev(r.endFloor) or "?"
+        imgui.Text(string.format("  %s  %dP  %s  %s%s",
             r.difficulty or "?",
             r.playerCount or 1,
             dateStr,
+            floorStr,
             tag))
 
         imgui.Text(string.format("  %s  %s/hr",
