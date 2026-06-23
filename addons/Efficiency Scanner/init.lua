@@ -131,7 +131,9 @@ local graphModeNames = {
     "EXP/hr Rate", "Cumulative EXP", "EXP per Floor",
     "Drops over Time", "Drops per Floor", "Drop Breakdown",
 }
-local difficultyAbbrev = {"Norm", "Hard", "VH", "Ult"}
+local difficultyAbbrev   = {"Norm", "Hard", "VH", "Ult"}
+local historySort        = 1
+local historySortNames   = { "Recent", "Name", "EXP" }
 
 local MAX_HISTORY    = 50
 local sessionHistory = {}
@@ -817,22 +819,46 @@ local function PresentHistory()
     local count = table.getn(sessionHistory)
     imgui.Separator()
     if count == 0 then
-        imgui.Text("No completed runs this session")
+        imgui.Text("No completed runs recorded")
         return
     end
 
     imgui.Text(string.format("History (%d)", count))
+    imgui.SameLine(0, 8)
+    if imgui.Button("<##hsort_ES") then
+        historySort = historySort == 1 and 3 or historySort - 1
+    end
+    imgui.SameLine(0, 4)
+    imgui.Text(historySortNames[historySort])
+    imgui.SameLine(0, 4)
+    if imgui.Button(">##hsort_ES") then
+        historySort = historySort == 3 and 1 or historySort + 1
+    end
+
+    -- Build display order without mutating sessionHistory
+    local indices = {}
+    for i = 1, count do indices[i] = i end
+    if historySort == 2 then
+        table.sort(indices, function(a, b)
+            return sessionHistory[a].questName < sessionHistory[b].questName
+        end)
+    elseif historySort == 3 then
+        table.sort(indices, function(a, b)
+            return (sessionHistory[a].expGained or 0) > (sessionHistory[b].expGained or 0)
+        end)
+    end
 
     local childH = math.min(count, HIST_MAX_VIS) * HIST_ENTRY_H
     imgui.BeginChild("##hist_ES", 0, childH, false)
     local deleteIndex = nil
-    for i = 1, count do
-        local r    = sessionHistory[i]
+    for pos = 1, count do
+        local i = indices[pos]
+        local r = sessionHistory[i]
         local name = r.questName
         if string.len(name) > 20 then
             name = string.sub(name, 1, 17) .. "..."
         end
-        imgui.Text(string.format("#%d %s", i, name))
+        imgui.Text(string.format("#%d %s", pos, name))
         imgui.SameLine()
         if imgui.Button("x##del_ES_" .. i) then
             deleteIndex = i
@@ -842,8 +868,8 @@ local function PresentHistory()
         if r.endReason == "exit"       then tag = "  [exit]"
         elseif r.endReason == "manual" then tag = "  [stop]"
         end
-        local dateStr    = r.timestamp and os.date("%b %d", r.timestamp) or "?"
-        local floorStr   = r.endFloor and r.endFloor > 0 and FloorAbbrev(r.endFloor) or "?"
+        local dateStr  = r.timestamp and os.date("%b %d", r.timestamp) or "?"
+        local floorStr = r.endFloor and r.endFloor > 0 and FloorAbbrev(r.endFloor) or "?"
         imgui.Text(string.format("  %s  %dP  %s  %s%s",
             r.difficulty or "?",
             r.playerCount or 1,
@@ -855,7 +881,7 @@ local function PresentHistory()
             FormatTime(r.elapsedMs),
             FormatNumberShort(r.expPerHour)))
 
-        if i < count then imgui.Separator() end
+        if pos < count then imgui.Separator() end
     end
     imgui.EndChild()
 
