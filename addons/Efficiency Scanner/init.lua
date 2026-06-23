@@ -266,12 +266,25 @@ local function GetCurrentLevel()
     return ok and (lv + 1) or 0
 end
 
-local function GetLevelPercent()
+local function GetLevelInfo()
     local level = GetCurrentLevel()
-    if level < 1 or level >= 200 then return nil end
-    local xpNeeded = lib_level_exp[level + 1] - lib_level_exp[level]
-    if xpNeeded <= 0 then return nil end
-    return session.expGained / xpNeeded * 100
+    if level < 1 or level >= 200 then return nil, nil end
+    local xpForLevel = lib_level_exp[level + 1] - lib_level_exp[level]
+    if xpForLevel <= 0 or session.expGained <= 0 then return nil, nil end
+    local pct = session.expGained / xpForLevel * 100
+    local xpRemaining = lib_level_exp[level + 1] - (session.startExp + session.expGained)
+    local runs = xpRemaining > 0 and math.ceil(xpRemaining / session.expGained) or 0
+    return pct, runs
+end
+
+local function PresentLevelInfo()
+    local pct, runs = GetLevelInfo()
+    if not pct then return end
+    if runs > 0 then
+        imgui.Text(string.format("  %.1f%% of current lvl  (~%d runs)", pct, runs))
+    else
+        imgui.Text(string.format("  %.1f%% of current lvl", pct))
+    end
 end
 
 local function GetDifficulty()
@@ -935,12 +948,8 @@ local function PresentMainWindow()
         imgui.Text(string.format("Diff:   %s / %dP", difficultyAbbrev[session.difficulty + 1] or "?", session.playerCount))
         imgui.Separator()
         imgui.Text("Time:   " .. FormatTime(session.elapsedMs))
-        local lvPct = GetLevelPercent()
-        if lvPct then
-            imgui.Text(string.format("EXP:    %s  (%.1f%%)", FormatNumber(session.expGained), lvPct))
-        else
-            imgui.Text("EXP:    " .. FormatNumber(session.expGained))
-        end
+        imgui.Text("EXP:    " .. FormatNumber(session.expGained))
+        PresentLevelInfo()
         imgui.Text("EXP/hr: " .. FormatNumber(expPerHour))
         imgui.Text(string.format("Drops:  Rare:%d  Hit:%d  Tech:%d",
             session.drops.rareCount, session.drops.hitCount, session.drops.techCount))
@@ -989,6 +998,7 @@ local function PresentMainWindow()
         imgui.Text(string.format("Diff:   %s / %dP", difficultyAbbrev[session.difficulty + 1] or "?", session.playerCount))
         imgui.Text("Time:   " .. FormatTime(session.elapsedMs))
         imgui.Text("EXP:    " .. FormatNumber(session.expGained))
+        PresentLevelInfo()
         imgui.Text("EXP/hr: " .. FormatNumber(expPerHour))
         imgui.Text(string.format("Drops:  Rare:%d  Hit:%d  Tech:%d",
             session.drops.rareCount, session.drops.hitCount, session.drops.techCount))
