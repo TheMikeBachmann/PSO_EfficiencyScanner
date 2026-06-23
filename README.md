@@ -21,7 +21,8 @@ Download from [Solybum/PSOBBMod-Addons](https://github.com/Solybum/PSOBBMod-Addo
 ## Installation
 
 1. Download this repository (click **Code → Download ZIP** or clone it)
-2. Copy the `Efficiency Scanner` folder into your PSOBB `addons/` directory:
+2. Create a folder named exactly `Efficiency Scanner` inside your PSOBB `addons/` directory
+3. Copy `init.lua` and `configuration.lua` into that folder:
 
 ```
 PSOBB/
@@ -32,7 +33,7 @@ PSOBB/
         └── configuration.lua
 ```
 
-3. Launch the game. The addon will appear in the addon menu (default key: `` ` ``)
+4. Launch the game. The addon will appear in the addon menu (default key: `` ` ``)
 
 ## Usage
 
