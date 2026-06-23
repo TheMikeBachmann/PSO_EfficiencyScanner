@@ -49,6 +49,11 @@ local function ConfigurationWindow(configuration)
                 this.changed = true
             end
 
+            if imgui.Checkbox("Count player-dropped items (debug)##ES", _configuration.dropCountPlayerDrops) then
+                _configuration.dropCountPlayerDrops = not _configuration.dropCountPlayerDrops
+                this.changed = true
+            end
+
             imgui.TreePop()
         end
 

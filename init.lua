@@ -164,6 +164,7 @@ if optionsLoaded then
     options.dropTechLevel             = lib_helpers.NotNilOrDefault(options.dropTechLevel, 20)
     options.dropHitPercent            = lib_helpers.NotNilOrDefault(options.dropHitPercent, 30)
     options.dropRareEnabled           = lib_helpers.NotNilOrDefault(options.dropRareEnabled, true)
+    options.dropCountPlayerDrops      = lib_helpers.NotNilOrDefault(options.dropCountPlayerDrops, false)
 else
     options =
     {
@@ -182,9 +183,10 @@ else
         windowAlwaysAutoResize = "AlwaysAutoResize",
         lastQuestName   = "",
         graphMode       = 1,
-        dropTechLevel   = 20,
-        dropHitPercent  = 30,
-        dropRareEnabled = true,
+        dropTechLevel        = 20,
+        dropHitPercent       = 30,
+        dropRareEnabled      = true,
+        dropCountPlayerDrops = false,
     }
 end
 
@@ -211,6 +213,7 @@ local function SaveOptions()
         io.write(string.format("    dropTechLevel = %i,\n",              options.dropTechLevel))
         io.write(string.format("    dropHitPercent = %i,\n",             options.dropHitPercent))
         io.write(string.format("    dropRareEnabled = %s,\n",            tostring(options.dropRareEnabled)))
+        io.write(string.format("    dropCountPlayerDrops = %s,\n",       tostring(options.dropCountPlayerDrops)))
         io.write("}\n")
         io.close(file)
     end
@@ -402,6 +405,26 @@ local function RecordFloorExit(floor)
     graph.lastFloorDropRare = session.drops.rareCount
 end
 
+local function PreloadInventoryIds()
+    local ok, count = pcall(pso.read_u32, _ItemArrayCount)
+    if not ok or count == 0 or count > 1024 then return end
+    local ok0, itemArray = pcall(pso.read_u32, _ItemArrayPtr)
+    if not ok0 or itemArray == 0 then return end
+    local playerIdx = pso.read_u32(_MyPlayerIndex)
+    for i = 0, count - 1 do
+        local ok2, entity = pcall(pso.read_u32, itemArray + i * 4)
+        if ok2 and entity ~= 0 then
+            local ok3, owner = pcall(pso.read_i8, entity + 0xE4)
+            if ok3 and owner == playerIdx then
+                local ok4, itemId = pcall(pso.read_u32, entity + 0xD8)
+                if ok4 and itemId ~= 0 then
+                    session.seenDropIds[itemId] = true
+                end
+            end
+        end
+    end
+end
+
 local function StartSession()
     local exp          = GetCurrentExp()
     session.state      = STATE_ACTIVE
@@ -416,6 +439,9 @@ local function StartSession()
     session.drops            = { techCount = 0, hitCount = 0, rareCount = 0 }
     session.seenDropIds      = {}
     session.lastDropScanTick = 0
+    if not options.dropCountPlayerDrops then
+        PreloadInventoryIds()
+    end
     ResetGraph()
     options.lastQuestName = session.questName
     SaveOptions()
@@ -509,20 +535,20 @@ local function ClassifyDrop(entity)
     local typ     = pso.read_u8(entity + 0xF3)
     local subtype = pso.read_u8(entity + 0xF4)
 
-    -- Tech disk: tool (3), technique subtype (2)
-    -- data[2] (0xF4) is the technique ID; data[3] (0xF5) is level-1
+    -- Tech disk: tool (3), type byte 2 = technique
+    -- data[3] at +0xF4 is level-1; technique identity is stored separately at +0x108
     if cat == 3 and typ == 2 then
-        local level = pso.read_u8(entity + 0xF5) + 1
+        local level = pso.read_u8(entity + 0xF4) + 1
         if level >= options.dropTechLevel then
             session.drops.techCount = session.drops.techCount + 1
         end
     end
 
-    -- Weapon hit%: scan 3 attribute pairs starting at +0xF7
+    -- Weapon hit%: 3 attribute pairs at _ItemWepStats = 0x1C8 (type, value bytes interleaved)
     if cat == 0 then
         for j = 0, 2 do
-            local statType  = pso.read_u8(entity + 0xF7 + j * 2)
-            local statValue = pso.read_u8(entity + 0xF8 + j * 2)
+            local statType  = pso.read_u8(entity + 0x1C8 + j * 2)
+            local statValue = pso.read_u8(entity + 0x1C9 + j * 2)
             if statType == 5 and statValue >= options.dropHitPercent then
                 session.drops.hitCount = session.drops.hitCount + 1
                 break
@@ -530,11 +556,11 @@ local function ClassifyDrop(entity)
         end
     end
 
-    -- Rare: look up hex ID in solylib items list
+    -- Rare: look up hex ID in solylib items list; COLOR_RARE = 0xFFFF0000 (red)
     if options.dropRareEnabled then
         local hex   = cat * 0x10000 + typ * 0x100 + subtype
         local entry = lib_items_list.t[hex]
-        if entry and entry[1] ~= 0 then
+        if entry and entry[1] == 0xFFFF0000 then
             session.drops.rareCount = session.drops.rareCount + 1
         end
     end
@@ -542,14 +568,17 @@ end
 
 local function ScanDrops()
     local tick = pso.get_tick_count()
-    if tick - session.lastDropScanTick < 500 then return end
+    if tick - session.lastDropScanTick < 200 then return end
     session.lastDropScanTick = tick
 
     local ok, count = pcall(pso.read_u32, _ItemArrayCount)
     if not ok or count == 0 or count > 1024 then return end
 
+    local ok0, itemArray = pcall(pso.read_u32, _ItemArrayPtr)
+    if not ok0 or itemArray == 0 then return end
+
     for i = 0, count - 1 do
-        local ok2, entity = pcall(pso.read_u32, _ItemArrayPtr + i * 4)
+        local ok2, entity = pcall(pso.read_u32, itemArray + i * 4)
         if ok2 and entity ~= 0 then
             local ok3, owner = pcall(pso.read_i8, entity + 0xE4)
             if ok3 and owner == -1 then
