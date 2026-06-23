@@ -817,13 +817,18 @@ local function PresentHistory()
 
     local childH = math.min(count, HIST_MAX_VIS) * HIST_ENTRY_H
     imgui.BeginChild("##hist_ES", 0, childH, false)
+    local deleteIndex = nil
     for i = 1, count do
         local r    = sessionHistory[i]
         local name = r.questName
-        if string.len(name) > 22 then
-            name = string.sub(name, 1, 19) .. "..."
+        if string.len(name) > 20 then
+            name = string.sub(name, 1, 17) .. "..."
         end
         imgui.Text(string.format("#%d %s", i, name))
+        imgui.SameLine()
+        if imgui.Button("x##del_ES_" .. i) then
+            deleteIndex = i
+        end
 
         local tag = ""
         if r.endReason == "exit"       then tag = "  [exit]"
@@ -843,6 +848,11 @@ local function PresentHistory()
         if i < count then imgui.Separator() end
     end
     imgui.EndChild()
+
+    if deleteIndex then
+        table.remove(sessionHistory, deleteIndex)
+        SaveHistory()
+    end
 end
 
 local function PresentMainWindow()
