@@ -51,6 +51,19 @@ The addon automatically detects when you enter and leave a quest by watching for
 
 Taking a telepipe back to town pauses tracking; time spent in town is excluded from all calculations. Using `$exit` ends the run immediately.
 
+### Active Session Readouts
+
+| Field | Description |
+|---|---|
+| Quest | Quest name (manually entered) |
+| Area | Current floor area |
+| Diff | Difficulty and player count |
+| Time | Elapsed quest time (excludes time spent in town) |
+| EXP | Total experience earned this run |
+| *(% line)* | Earned EXP as a percentage of the current level's total requirement, e.g. `4.2% of current lvl`. Also shows `(~N runs)` — how many more runs of this size are needed to level up from your current position in the level. The runs estimate disappears once you have enough XP from the run to cover the remainder |
+| EXP/hr | EXP per hour rate for the current run |
+| Drops | Running count of rare items, hit weapons, and tech disks that met the configured thresholds |
+
 ## Drop Tracking
 
 Three categories of drops are tracked per run:
