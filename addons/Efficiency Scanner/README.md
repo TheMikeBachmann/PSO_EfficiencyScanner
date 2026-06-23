@@ -8,9 +8,9 @@ A PSO Blue Burst addon that tracks quest efficiency per run — EXP/hr, elapsed 
 
 The addon plugin must be installed in your PSOBB client. It provides the Lua runtime, ImGui bindings, and the `pso.*` memory API that this addon depends on.
 
-- **PSOBB.IO**: The addon plugin is bundled with the client — no separate installation needed.
-- **Other servers**: Download and install from [Solybum/psobbaddonplugin](https://github.com/Solybum/psobbaddonplugin) or the original [HybridEidolon/psobbaddonplugin](https://github.com/HybridEidolon/psobbaddonplugin).
-  - Also requires **Visual C++ Redistributable for Visual Studio 2015** ([download from Microsoft](https://www.microsoft.com/en-us/download/details.aspx?id=48145))
+Download and install from [Solybum/psobbaddonplugin](https://github.com/Solybum/psobbaddonplugin) or the original [HybridEidolon/psobbaddonplugin](https://github.com/HybridEidolon/psobbaddonplugin).
+
+Also requires **Visual C++ Redistributable for Visual Studio 2015** ([download from Microsoft](https://www.microsoft.com/en-us/download/details.aspx?id=48145)).
 
 ### 2. solylib
 
@@ -21,7 +21,7 @@ Download from [Solybum/PSOBBMod-Addons](https://github.com/Solybum/PSOBBMod-Addo
 ## Installation
 
 1. Download this repository (click **Code → Download ZIP** or clone it)
-2. Copy the `addons/Efficiency Scanner/` folder into your PSOBB `addons/` directory:
+2. Copy the `addons/` folder from this repo into your PSOBB directory:
 
 ```
 PSOBB/
