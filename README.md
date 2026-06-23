@@ -1,4 +1,4 @@
-# Efficiency Scanner
+# Efficiency Scanner v0.4.0-beta
 
 A PSO Blue Burst addon that tracks quest efficiency per run — EXP/hr, elapsed time, drop counts, and per-floor breakdowns — with persistent session history and configurable drop tracking thresholds.
 
