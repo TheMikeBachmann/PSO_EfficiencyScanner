@@ -1,6 +1,7 @@
 local core_mainmenu  = require("core_mainmenu")
 local lib_helpers    = require("solylib.helpers")
 local lib_items_list = require("solylib.items.items_list")
+local lib_level_exp  = require("Efficiency Scanner.level_exp")
 local cfg            = require("Efficiency Scanner.configuration")
 local optionsLoaded, options = pcall(require, "Efficiency Scanner.options")
 local historyLoaded, savedHistory = pcall(require, "Efficiency Scanner.history")
@@ -256,6 +257,21 @@ local function GetCurrentExp()
     local base = GetPlayerBase()
     if base == 0 then return 0 end
     return pso.read_u32(base + _OffsetExp)
+end
+
+local function GetCurrentLevel()
+    local base = GetPlayerBase()
+    if base == 0 then return 0 end
+    local ok, lv = pcall(pso.read_u32, base + 0xE44)
+    return ok and (lv + 1) or 0
+end
+
+local function GetLevelPercent()
+    local level = GetCurrentLevel()
+    if level < 1 or level >= 200 then return nil end
+    local xpNeeded = lib_level_exp[level + 1] - lib_level_exp[level]
+    if xpNeeded <= 0 then return nil end
+    return session.expGained / xpNeeded * 100
 end
 
 local function GetDifficulty()
@@ -919,7 +935,12 @@ local function PresentMainWindow()
         imgui.Text(string.format("Diff:   %s / %dP", difficultyAbbrev[session.difficulty + 1] or "?", session.playerCount))
         imgui.Separator()
         imgui.Text("Time:   " .. FormatTime(session.elapsedMs))
-        imgui.Text("EXP:    " .. FormatNumber(session.expGained))
+        local lvPct = GetLevelPercent()
+        if lvPct then
+            imgui.Text(string.format("EXP:    %s  (%.1f%%)", FormatNumber(session.expGained), lvPct))
+        else
+            imgui.Text("EXP:    " .. FormatNumber(session.expGained))
+        end
         imgui.Text("EXP/hr: " .. FormatNumber(expPerHour))
         imgui.Text(string.format("Drops:  Rare:%d  Hit:%d  Tech:%d",
             session.drops.rareCount, session.drops.hitCount, session.drops.techCount))
