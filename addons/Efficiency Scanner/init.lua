@@ -133,7 +133,7 @@ local graphModeNames = {
 }
 local difficultyAbbrev   = {"Norm", "Hard", "VH", "Ult"}
 local historySort        = 1
-local historySortNames   = { "Recent", "Name", "EXP" }
+local historySortNames   = { "Recent", "Name", "EXP", "EXP/hr" }
 
 local MAX_HISTORY    = 50
 local sessionHistory = {}
@@ -826,13 +826,13 @@ local function PresentHistory()
     imgui.Text(string.format("History (%d)", count))
     imgui.SameLine(0, 8)
     if imgui.Button("<##hsort_ES") then
-        historySort = historySort == 1 and 3 or historySort - 1
+        historySort = historySort == 1 and 4 or historySort - 1
     end
     imgui.SameLine(0, 4)
     imgui.Text(historySortNames[historySort])
     imgui.SameLine(0, 4)
     if imgui.Button(">##hsort_ES") then
-        historySort = historySort == 3 and 1 or historySort + 1
+        historySort = historySort == 4 and 1 or historySort + 1
     end
 
     -- Build display order without mutating sessionHistory
@@ -845,6 +845,10 @@ local function PresentHistory()
     elseif historySort == 3 then
         table.sort(indices, function(a, b)
             return (sessionHistory[a].expGained or 0) > (sessionHistory[b].expGained or 0)
+        end)
+    elseif historySort == 4 then
+        table.sort(indices, function(a, b)
+            return (sessionHistory[a].expPerHour or 0) > (sessionHistory[b].expPerHour or 0)
         end)
     end
 
