@@ -136,6 +136,8 @@ local graphModeNames = {
 local difficultyAbbrev   = {"Norm", "Hard", "VH", "Ult"}
 local historySort        = 1
 local historySortNames   = { "Recent", "Name", "EXP", "EXP/hr" }
+local histDetailIdx      = nil
+local histDetailGraphMode = 1
 
 local MAX_HISTORY    = 50
 local sessionHistory = {}
@@ -224,6 +226,30 @@ local function SaveOptions()
     end
 end
 
+local function CopyArray(t)
+    local r = {}
+    for i = 1, table.getn(t) do r[i] = t[i] end
+    return r
+end
+
+local function WriteNumArray(name, arr)
+    io.write("            " .. name .. " = {")
+    for i = 1, table.getn(arr) do
+        if i > 1 then io.write(",") end
+        io.write(arr[i])
+    end
+    io.write("},\n")
+end
+
+local function WriteStrArray(name, arr)
+    io.write("            " .. name .. " = {")
+    for i = 1, table.getn(arr) do
+        if i > 1 then io.write(",") end
+        io.write(string.format("%q", arr[i]))
+    end
+    io.write("},\n")
+end
+
 local function SaveHistory()
     local file = io.open(historyFileName, "w")
     if file == nil then return end
@@ -243,6 +269,22 @@ local function SaveHistory()
         local d = r.drops or {}
         io.write(string.format("        drops = { techCount=%i, hitCount=%i, rareCount=%i },\n",
             d.techCount or 0, d.hitCount or 0, d.rareCount or 0))
+        local g = r.graph
+        if g then
+            io.write("        graph = {\n")
+            WriteNumArray("rateData",      g.rateData      or {})
+            WriteNumArray("cumulativeData", g.cumulativeData or {})
+            WriteNumArray("floorValues",   g.floorValues   or {})
+            WriteStrArray("floorLabels",   g.floorLabels   or {})
+            WriteNumArray("floorIds",      g.floorIds      or {})
+            WriteNumArray("dropTechData",  g.dropTechData  or {})
+            WriteNumArray("dropHitData",   g.dropHitData   or {})
+            WriteNumArray("dropRareData",  g.dropRareData  or {})
+            WriteNumArray("floorDropTech", g.floorDropTech or {})
+            WriteNumArray("floorDropHit",  g.floorDropHit  or {})
+            WriteNumArray("floorDropRare", g.floorDropRare or {})
+            io.write("        },\n")
+        end
         io.write("    },\n")
     end
     io.write("}\n")
@@ -547,6 +589,19 @@ local function EndSession()
             hitCount  = session.drops.hitCount,
             rareCount = session.drops.rareCount,
         },
+        graph = {
+            rateData       = CopyArray(graph.rateData),
+            cumulativeData = CopyArray(graph.cumulativeData),
+            floorValues    = CopyArray(graph.floorValues),
+            floorLabels    = CopyArray(graph.floorLabels),
+            floorIds       = CopyArray(graph.floorIds),
+            dropTechData   = CopyArray(graph.dropTechData),
+            dropHitData    = CopyArray(graph.dropHitData),
+            dropRareData   = CopyArray(graph.dropRareData),
+            floorDropTech  = CopyArray(graph.floorDropTech),
+            floorDropHit   = CopyArray(graph.floorDropHit),
+            floorDropRare  = CopyArray(graph.floorDropRare),
+        },
     }
     table.insert(sessionHistory, 1, record)
     if table.getn(sessionHistory) > MAX_HISTORY then
@@ -731,26 +786,13 @@ local function FloorLegendParts(ids, count)
     return parts
 end
 
-local function PresentGraph()
-    local modeCount = table.getn(graphModeNames)
-
-    if imgui.Button("<##gmode_ES") then
-        options.graphMode = options.graphMode > 1 and options.graphMode - 1 or modeCount
-        SaveOptions()
-    end
-    imgui.SameLine()
-    imgui.Text(graphModeNames[options.graphMode])
-    imgui.SameLine()
-    if imgui.Button(">##gmode_ES") then
-        options.graphMode = options.graphMode < modeCount and options.graphMode + 1 or 1
-        SaveOptions()
-    end
-
+local function RenderGraph(gdata, gdrops, gmode, idSuffix)
     local graphW = imgui.GetWindowWidth() - 16
     local graphH = 80
+    local sfx    = idSuffix or ""
 
-    if options.graphMode == 1 then
-        local data      = graph.rateData
+    if gmode == 1 then
+        local data      = gdata.rateData or {}
         local dataCount = table.getn(data)
         if dataCount >= 2 then
             local maxVal = 1
@@ -758,36 +800,34 @@ local function PresentGraph()
                 if data[i] > maxVal then maxVal = data[i] end
             end
             local overlay = "Now: " .. FormatNumber(data[dataCount]) .. "/hr"
-            imgui.PlotLines("##rategraph_ES", data, dataCount, 0, overlay, 0.0, maxVal * 1.1, graphW, graphH)
+            imgui.PlotLines("##rategraph_ES" .. sfx, data, dataCount, 0, overlay, 0.0, maxVal * 1.1, graphW, graphH)
         else
             imgui.Text("Collecting data... (samples every 10s)")
         end
 
-    elseif options.graphMode == 2 then
-        local data      = graph.cumulativeData
+    elseif gmode == 2 then
+        local data      = gdata.cumulativeData or {}
         local dataCount = table.getn(data)
         if dataCount >= 2 then
             local maxVal  = data[dataCount] > 0 and data[dataCount] or 1
             local overlay = FormatNumber(data[dataCount]) .. " EXP"
-            imgui.PlotLines("##cumulgraph_ES", data, dataCount, 0, overlay, 0.0, maxVal * 1.1, graphW, graphH)
+            imgui.PlotLines("##cumulgraph_ES" .. sfx, data, dataCount, 0, overlay, 0.0, maxVal * 1.1, graphW, graphH)
         else
             imgui.Text("Collecting data... (samples every 10s)")
         end
 
-    elseif options.graphMode == 3 then
-        local data      = graph.floorValues
+    elseif gmode == 3 then
+        local data      = gdata.floorValues or {}
         local dataCount = table.getn(data)
         if dataCount >= 1 then
             local maxVal = 1
             for i = 1, dataCount do
                 if data[i] > maxVal then maxVal = data[i] end
             end
-            local lastLabel = graph.floorLabels[dataCount] or ""
+            local lastLabel = (gdata.floorLabels or {})[dataCount] or ""
             local overlay   = lastLabel .. ": " .. FormatNumber(data[dataCount])
-            imgui.PlotHistogram("##floorgraph_ES", data, dataCount, 0, overlay, 0.0, maxVal * 1.1, graphW, graphH)
-
-            -- Floor legend: abbreviated names with EXP amounts
-            local abbrs = FloorLegendParts(graph.floorIds, dataCount)
+            imgui.PlotHistogram("##floorgraph_ES" .. sfx, data, dataCount, 0, overlay, 0.0, maxVal * 1.1, graphW, graphH)
+            local abbrs = FloorLegendParts(gdata.floorIds or {}, dataCount)
             local parts = {}
             for i = 1, dataCount do
                 table.insert(parts, abbrs[i] .. ":" .. FormatNumberShort(data[i]))
@@ -797,12 +837,11 @@ local function PresentGraph()
             imgui.Text("No floor transitions yet")
         end
 
-    elseif options.graphMode == 4 then
-        -- Cumulative drops over time — three stacked line graphs
+    elseif gmode == 4 then
         local miniH    = 35
-        local seriesD  = { graph.dropTechData,  graph.dropHitData,  graph.dropRareData  }
-        local curCount = { session.drops.techCount, session.drops.hitCount, session.drops.rareCount }
-        local seriesID = { "##droptech_ES",     "##drophit_ES",     "##droprare_ES"     }
+        local seriesD  = { gdata.dropTechData or {}, gdata.dropHitData or {}, gdata.dropRareData or {} }
+        local curCount = { gdrops.techCount or 0, gdrops.hitCount or 0, gdrops.rareCount or 0 }
+        local seriesID = { "##droptech_ES" .. sfx, "##drophit_ES" .. sfx, "##droprare_ES" .. sfx }
         local seriesLbl = {
             "Tech Lv" .. options.dropTechLevel .. "+",
             "Hit " .. options.dropHitPercent .. "%+",
@@ -823,13 +862,13 @@ local function PresentGraph()
             end
         end
 
-    elseif options.graphMode == 5 then
-        -- Drops per floor — three stacked histograms
-        local dataCount = table.getn(graph.floorDropTech)
+    elseif gmode == 5 then
+        local floorDropTech = gdata.floorDropTech or {}
+        local dataCount     = table.getn(floorDropTech)
         if dataCount >= 1 then
             local miniH    = 30
-            local seriesD  = { graph.floorDropTech, graph.floorDropHit, graph.floorDropRare }
-            local seriesID = { "##fdroptech_ES", "##fdrophit_ES", "##fdroprare_ES" }
+            local seriesD  = { floorDropTech, gdata.floorDropHit or {}, gdata.floorDropRare or {} }
+            local seriesID = { "##fdroptech_ES" .. sfx, "##fdrophit_ES" .. sfx, "##fdroprare_ES" .. sfx }
             local seriesLbl = { "Tech", "Hit", "Rare" }
             for di = 1, 3 do
                 local data   = seriesD[di]
@@ -839,25 +878,39 @@ local function PresentGraph()
                 end
                 imgui.PlotHistogram(seriesID[di], data, dataCount, 0, seriesLbl[di], 0.0, maxVal + 1, graphW, miniH)
             end
-            -- Floor legend
-            imgui.Text(table.concat(FloorLegendParts(graph.floorIds, dataCount), "  "))
+            imgui.Text(table.concat(FloorLegendParts(gdata.floorIds or {}, dataCount), "  "))
         else
             imgui.Text("No floor transitions yet")
         end
 
-    elseif options.graphMode == 6 then
-        -- Drop category breakdown — single 3-bar histogram
-        local breakdown = { session.drops.rareCount, session.drops.hitCount, session.drops.techCount }
+    elseif gmode == 6 then
+        local breakdown = { gdrops.rareCount or 0, gdrops.hitCount or 0, gdrops.techCount or 0 }
         local maxVal    = 1
         for i = 1, 3 do
             if breakdown[i] > maxVal then maxVal = breakdown[i] end
         end
         local total = breakdown[1] + breakdown[2] + breakdown[3]
-        imgui.PlotHistogram("##dropbreak_ES", breakdown, 3, 0, "Total: " .. total, 0.0, maxVal + 1, graphW, graphH)
+        imgui.PlotHistogram("##dropbreak_ES" .. sfx, breakdown, 3, 0, "Total: " .. total, 0.0, maxVal + 1, graphW, graphH)
         imgui.Text(string.format("Rare:%d   Hit%d+:%d   Lv%d+:%d",
             breakdown[1], options.dropHitPercent, breakdown[2],
             options.dropTechLevel, breakdown[3]))
     end
+end
+
+local function PresentGraph()
+    local modeCount = table.getn(graphModeNames)
+    if imgui.Button("<##gmode_ES") then
+        options.graphMode = options.graphMode > 1 and options.graphMode - 1 or modeCount
+        SaveOptions()
+    end
+    imgui.SameLine()
+    imgui.Text(graphModeNames[options.graphMode])
+    imgui.SameLine()
+    if imgui.Button(">##gmode_ES") then
+        options.graphMode = options.graphMode < modeCount and options.graphMode + 1 or 1
+        SaveOptions()
+    end
+    RenderGraph(graph, session.drops, options.graphMode, "")
 end
 
 local HIST_ENTRY_H  = 56   -- 3 text lines + separator
@@ -913,6 +966,11 @@ local function PresentHistory()
         end
         imgui.Text(string.format("#%d %s", pos, name))
         imgui.SameLine()
+        if imgui.Button(">##open_ES_" .. i) then
+            histDetailIdx = i
+            histDetailGraphMode = 1
+        end
+        imgui.SameLine()
         if imgui.Button("x##del_ES_" .. i) then
             deleteIndex = i
         end
@@ -942,6 +1000,51 @@ local function PresentHistory()
         table.remove(sessionHistory, deleteIndex)
         SaveHistory()
     end
+end
+
+local function PresentHistoryDetailWindow()
+    if histDetailIdx == nil then return end
+    local r = sessionHistory[histDetailIdx]
+    if r == nil then histDetailIdx = nil return end
+
+    imgui.SetNextWindowSize(330, 360, "FirstUseEver")
+    if imgui.Begin("Run Detail##histdetail_ES") then
+        local dateStr = r.timestamp and os.date("%b %d %Y  %H:%M", r.timestamp) or "?"
+        imgui.Text(r.questName)
+        imgui.Text(string.format("%s  %s / %dP", dateStr, r.difficulty or "?", r.playerCount or 1))
+        local endFloorName = r.endFloor and r.endFloor > 0 and (floorNames[r.endFloor] or "?") or "?"
+        local endTag = ""
+        if r.endReason == "exit"       then endTag = "  [exit]"
+        elseif r.endReason == "manual" then endTag = "  [stop]"
+        end
+        imgui.Text("End floor: " .. endFloorName .. endTag)
+        imgui.Separator()
+        imgui.Text("Time:   " .. FormatTime(r.elapsedMs))
+        imgui.Text("EXP:    " .. FormatNumber(r.expGained))
+        imgui.Text("EXP/hr: " .. FormatNumber(r.expPerHour))
+        local d = r.drops or {}
+        imgui.Text(string.format("Drops:  Rare:%d  Hit:%d  Tech:%d",
+            d.rareCount or 0, d.hitCount or 0, d.techCount or 0))
+        if r.graph then
+            imgui.Separator()
+            local modeCount = table.getn(graphModeNames)
+            if imgui.Button("<##dgmode_ES") then
+                histDetailGraphMode = histDetailGraphMode > 1 and histDetailGraphMode - 1 or modeCount
+            end
+            imgui.SameLine()
+            imgui.Text(graphModeNames[histDetailGraphMode])
+            imgui.SameLine()
+            if imgui.Button(">##dgmode_ES") then
+                histDetailGraphMode = histDetailGraphMode < modeCount and histDetailGraphMode + 1 or 1
+            end
+            RenderGraph(r.graph, r.drops or {}, histDetailGraphMode, "d")
+        end
+        imgui.Separator()
+        if imgui.Button("Close##histdetail_ES") then
+            histDetailIdx = nil
+        end
+    end
+    imgui.End()
 end
 
 local function PresentMainWindow()
@@ -1083,6 +1186,8 @@ local function present()
     if options.windowTransparent then
         imgui.PopStyleColor()
     end
+
+    PresentHistoryDetailWindow()
 
     if firstPresent then
         firstPresent = false
