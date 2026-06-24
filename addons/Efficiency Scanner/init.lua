@@ -104,6 +104,9 @@ local session = {
     drops            = { techCount = 0, hitCount = 0, rareCount = 0 },
     seenDropIds      = {},
     lastDropScanTick = 0,
+    startTimestamp   = 0,
+    partyNames       = {},
+    runId            = "",
 }
 
 -- Graph data — sampled every 10s, capped at 120 points (~20 min of history)
@@ -269,6 +272,8 @@ local function SaveHistory()
         local d = r.drops or {}
         io.write(string.format("        drops = { techCount=%i, hitCount=%i, rareCount=%i },\n",
             d.techCount or 0, d.hitCount or 0, d.rareCount or 0))
+        io.write(string.format("        runId        = %q,\n", r.runId or ""))
+        WriteStrArray("partyNames", r.partyNames or {})
         local g = r.graph
         if g then
             io.write("        graph = {\n")
@@ -511,6 +516,40 @@ local function ReadQuestName()
     return name
 end
 
+-- djb2 hash — no bit-library dependency, good distribution for short strings
+local function HashString(str)
+    local h = 5381
+    for i = 1, #str do
+        h = (h * 33 + string.byte(str, i)) % 2147483647
+    end
+    return string.format("%07x", h)
+end
+
+-- Reads the name of every occupied player slot (0-3) and returns them sorted.
+-- Character name sits at +0x428 from the player entity base (ASCII, up to 16 chars).
+local function ReadPartyNames()
+    local names = {}
+    for slot = 0, 3 do
+        local okp, ptr = pcall(pso.read_u32, _PlayerArray + slot * 4)
+        if okp and ptr ~= 0 then
+            local okn, name = pcall(pso.read_str, ptr + 0x428, 16)
+            if okn and name and name ~= "" then
+                table.insert(names, name)
+            end
+        end
+    end
+    table.sort(names)
+    return names
+end
+
+-- Produces a run ID that is identical for all players in the same game instance.
+-- Inputs: sorted player names, quest name, start wall-clock time rounded to 5 min.
+local function GenerateRunId(names, questName, startTime)
+    local rounded = math.floor(startTime / 300) * 300
+    local key     = table.concat(names, "|") .. "|" .. questName .. "|" .. rounded
+    return HashString(key)
+end
+
 local function StartSession()
     local exp          = GetCurrentExp()
     session.state      = STATE_ACTIVE
@@ -533,6 +572,9 @@ local function StartSession()
     if autoName then
         session.questName = autoName
     end
+    session.startTimestamp = os.time()
+    session.partyNames     = ReadPartyNames()
+    session.runId          = GenerateRunId(session.partyNames, session.questName, session.startTimestamp)
     ResetGraph()
     options.lastQuestName = session.questName
     SaveOptions()
@@ -584,6 +626,8 @@ local function EndSession()
         difficulty   = difficultyAbbrev[session.difficulty + 1] or "?",
         playerCount  = session.playerCount,
         timestamp    = os.time(),
+        runId        = session.runId,
+        partyNames   = CopyArray(session.partyNames),
         drops        = {
             techCount = session.drops.techCount,
             hitCount  = session.drops.hitCount,
@@ -1038,6 +1082,13 @@ local function PresentHistoryDetailWindow()
                 histDetailGraphMode = histDetailGraphMode < modeCount and histDetailGraphMode + 1 or 1
             end
             RenderGraph(r.graph, r.drops or {}, histDetailGraphMode, "d")
+        end
+        imgui.Separator()
+        if r.partyNames and table.getn(r.partyNames) > 0 then
+            imgui.Text("Party:  " .. table.concat(r.partyNames, ", "))
+        end
+        if r.runId and r.runId ~= "" then
+            imgui.Text("Run ID: " .. r.runId)
         end
         imgui.Separator()
         if imgui.Button("Close##histdetail_ES") then
