@@ -38,7 +38,7 @@ PSOBB/
 
 The addon automatically detects when you enter and leave a quest by watching for floor transitions out of Pioneer 2. No manual start is required, though a **Start** button is available in the IDLE state to begin tracking manually.
 
-**Quest name** must be entered manually — type it into the field at the bottom of the window during an active run. The last-used name is pre-filled on the next run.
+**Quest name** is read automatically from memory as soon as a quest is loaded — it appears in the idle window while still on Pioneer 2, before the first floor transition. The name field remains editable if you want to override it.
 
 ### States
 
