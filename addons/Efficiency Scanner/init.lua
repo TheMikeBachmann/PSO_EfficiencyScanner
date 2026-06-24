@@ -1056,9 +1056,6 @@ local function PresentMainWindow()
         else
             imgui.Text("Status: Waiting for quest...")
         end
-        if imgui.Button("Start Manually##ES") then
-            StartSession()
-        end
         PresentHistory()
 
     elseif session.state == STATE_ACTIVE then
