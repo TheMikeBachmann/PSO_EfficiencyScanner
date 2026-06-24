@@ -866,13 +866,14 @@ local HIST_MAX_VIS  = 4    -- entries visible before scrolling
 local function PresentHistory()
     local count = table.getn(sessionHistory)
     imgui.Separator()
+    local header = count > 0 and string.format("History (%d)##hist_ES", count) or "History##hist_ES"
+    if not imgui.CollapsingHeader(header) then return end
+
     if count == 0 then
         imgui.Text("No completed runs recorded")
         return
     end
 
-    imgui.Text(string.format("History (%d)", count))
-    imgui.SameLine(0, 8)
     if imgui.Button("<##hsort_ES") then
         historySort = historySort == 1 and 4 or historySort - 1
     end
