@@ -944,8 +944,6 @@ local function PresentHistory()
 end
 
 local function PresentMainWindow()
-    local changed, newName
-
     if session.state == STATE_IDLE then
         local ok, qptr = pcall(pso.read_u32, _QuestPtrRoot)
         if ok and qptr ~= 0 then
@@ -953,11 +951,6 @@ local function PresentMainWindow()
             imgui.Text("Status: Waiting for first floor...")
         else
             imgui.Text("Status: Waiting for quest...")
-        end
-        imgui.Text("Quest Name")
-        changed, newName = imgui.InputText("##questname_ES", session.questName, 64)
-        if changed then
-            session.questName = newName
         end
         if imgui.Button("Start Manually##ES") then
             StartSession()
@@ -981,11 +974,6 @@ local function PresentMainWindow()
         imgui.Separator()
         PresentGraph()
         imgui.Separator()
-        imgui.Text("Quest Name")
-        changed, newName = imgui.InputText("##questname_ES", session.questName, 64)
-        if changed then
-            session.questName = newName
-        end
         if imgui.Button("Stop Manually##ES") then
             session.endReason = "manual"
             CommitEndSession()
