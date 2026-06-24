@@ -656,6 +656,10 @@ local function UpdateSession()
     session.currentFloor = floor
 
     if session.state == STATE_IDLE then
+        local autoName = ReadQuestName()
+        if autoName then
+            session.questName = autoName
+        end
         if not IsOnPioneerTwo(floor) and IsOnPioneerTwo(session.prevFloor) then
             StartSession()
         end
@@ -943,7 +947,13 @@ local function PresentMainWindow()
     local changed, newName
 
     if session.state == STATE_IDLE then
-        imgui.Text("Status: Waiting for quest...")
+        local ok, qptr = pcall(pso.read_u32, _QuestPtrRoot)
+        if ok and qptr ~= 0 then
+            imgui.Text("Quest:  " .. session.questName)
+            imgui.Text("Status: Waiting for first floor...")
+        else
+            imgui.Text("Status: Waiting for quest...")
+        end
         imgui.Text("Quest Name")
         changed, newName = imgui.InputText("##questname_ES", session.questName, 64)
         if changed then
