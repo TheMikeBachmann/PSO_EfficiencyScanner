@@ -999,7 +999,7 @@ local function PresentHistory()
     end
 
     local childH = math.min(count, HIST_MAX_VIS) * HIST_ENTRY_H
-    imgui.BeginChild("##hist_ES", 0, childH, false)
+    imgui.BeginChild("##histlist_ES", 0, childH, false)
     local deleteIndex = nil
     for pos = 1, count do
         local i = indices[pos]
