@@ -20,6 +20,7 @@ local _CurrentFloor      = 0xAAFCA0
 local _Difficulty        = 0x00A9CD68
 local _ItemArrayPtr      = 0x00A8D81C
 local _ItemArrayCount    = 0x00A8D820
+local _QuestPtrRoot      = 0x00A95AA8  -- non-zero when a quest is loaded
 
 -- Floor names derived from newserv StaticGameData floor table
 local floorNames = {
@@ -458,6 +459,16 @@ local function PreloadInventoryIds()
     end
 end
 
+local function ReadQuestName()
+    local ok1, root = pcall(pso.read_u32, _QuestPtrRoot)
+    if not ok1 or root == 0 then return nil end
+    local ok2, header = pcall(pso.read_u32, root + 0x19C)
+    if not ok2 or header == 0 then return nil end
+    local ok3, name = pcall(pso.read_wstr, header + 0x18, 32)
+    if not ok3 or name == nil or name == "" then return nil end
+    return name
+end
+
 local function StartSession()
     local exp          = GetCurrentExp()
     session.state      = STATE_ACTIVE
@@ -475,6 +486,10 @@ local function StartSession()
     session.lastEarnedFloor  = session.currentFloor
     if not options.dropCountPlayerDrops then
         PreloadInventoryIds()
+    end
+    local autoName = ReadQuestName()
+    if autoName then
+        session.questName = autoName
     end
     ResetGraph()
     options.lastQuestName = session.questName
