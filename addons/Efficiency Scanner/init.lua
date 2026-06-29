@@ -808,6 +808,12 @@ local function UpdateSession()
         elseif tick - session.pendingEndTick >= PENDING_END_TIMEOUT_MS then
             CommitEndSession()
         end
+
+    elseif session.state == STATE_COMPLETE then
+        if not IsOnPioneerTwo(floor) and IsOnPioneerTwo(session.prevFloor) then
+            ResetSession()
+            StartSession()
+        end
     end
 end
 
