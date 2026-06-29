@@ -684,6 +684,9 @@ local function ClassifyDrop(entity)
     local typ     = pso.read_u8(entity + 0xF3)
     local subtype = pso.read_u8(entity + 0xF4)
 
+    -- Sanity check: PSO BB item categories are 0–4; anything else is a stale/uninitialized entity
+    if cat > 4 then return end
+
     -- Tech disk: tool (3), type byte 2 = technique
     -- data[3] at +0xF4 is level-1; technique identity is stored separately at +0x108
     if cat == 3 and typ == 2 then
@@ -717,7 +720,7 @@ end
 
 local function ScanDrops()
     local tick = pso.get_tick_count()
-    if tick - session.lastDropScanTick < 200 then return end
+    if tick - session.lastDropScanTick < 100 then return end
     session.lastDropScanTick = tick
 
     local ok, count = pcall(pso.read_u32, _ItemArrayCount)
